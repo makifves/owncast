@@ -9,7 +9,7 @@ import (
 	"github.com/owncast/owncast/config"
 	"github.com/owncast/owncast/core/chat/events"
 	"github.com/owncast/owncast/core/data"
-	"github.com/owncast/owncast/core/webhooks"
+	"github.com/owncast/owncast/services/webhooks"
 	"github.com/owncast/owncast/storage"
 	"github.com/owncast/owncast/utils"
 	log "github.com/sirupsen/logrus"
@@ -91,7 +91,8 @@ func (s *Server) userNameChanged(eventData chatClientEvent) {
 	// Send chat user name changed webhook
 	receivedEvent.User = savedUser
 	receivedEvent.ClientID = eventData.client.Id
-	webhooks.SendChatEventUsernameChanged(receivedEvent)
+	webhookManager := webhooks.GetWebhooks()
+	webhookManager.SendChatEventUsernameChanged(receivedEvent)
 
 	// Resend the client's user so their username is in sync.
 	eventData.client.sendConnectedClientInfo()
@@ -158,7 +159,8 @@ func (s *Server) userMessageSent(eventData chatClientEvent) {
 	}
 
 	// Send chat message sent webhook
-	webhooks.SendChatEvent(&event)
+	webhookManager := webhooks.GetWebhooks()
+	webhookManager.SendChatEvent(&event)
 	chatMessagesSentCounter.Inc()
 
 	SaveUserMessage(event)
