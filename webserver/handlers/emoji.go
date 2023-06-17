@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/owncast/owncast/core/data"
 	"github.com/owncast/owncast/services/config"
 	"github.com/owncast/owncast/webserver/responses"
 )
