@@ -24,7 +24,7 @@ func (s *Server) userNameChanged(eventData chatClientEvent) {
 	proposedUsername := receivedEvent.NewName
 
 	// Check if name is on the blocklist
-	blocklist := data.GetForbiddenUsernameList()
+	blocklist := configRepository.GetForbiddenUsernameList()
 	userRepository := storage.GetUserRepository()
 
 	// Names have a max length
@@ -90,7 +90,7 @@ func (s *Server) userNameChanged(eventData chatClientEvent) {
 	// Send chat user name changed webhook
 	receivedEvent.User = savedUser
 	receivedEvent.ClientID = eventData.client.Id
-	webhookManager := webhooks.GetWebhooks()
+	webhookManager := webhooks.Get()
 	webhookManager.SendChatEventUsernameChanged(receivedEvent)
 
 	// Resend the client's user so their username is in sync.
@@ -144,7 +144,9 @@ func (s *Server) userMessageSent(eventData chatClientEvent) {
 		}
 	}
 
-	event.User = user.GetUserByToken(eventData.client.accessToken)
+	userRepository := storage.GetUserRepository()
+
+	event.User = userRepository.GetUserByToken(eventData.client.accessToken)
 
 	// Guard against nil users
 	if event.User == nil {
@@ -158,7 +160,7 @@ func (s *Server) userMessageSent(eventData chatClientEvent) {
 	}
 
 	// Send chat message sent webhook
-	webhookManager := webhooks.GetWebhooks()
+	webhookManager := webhooks.Get()
 	webhookManager.SendChatEvent(&event)
 	chatMessagesSentCounter.Inc()
 

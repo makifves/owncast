@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	"github.com/owncast/owncast/services/config"
+	"github.com/owncast/owncast/static"
 	"github.com/owncast/owncast/webserver/responses"
 )
 
 // GetCustomEmojiList returns a list of emoji via the API.
 func (h *Handlers) GetCustomEmojiList(w http.ResponseWriter, r *http.Request) {
-	emojiList := data.GetEmojiList()
+	emojiList := static.GetEmojiList()
 
 	if err := json.NewEncoder(w).Encode(emojiList); err != nil {
 		responses.InternalErrorHandler(w, err)

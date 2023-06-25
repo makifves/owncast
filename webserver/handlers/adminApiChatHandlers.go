@@ -12,7 +12,8 @@ import (
 	"github.com/owncast/owncast/core/chat"
 	"github.com/owncast/owncast/core/chat/events"
 	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/storage"
+	"github.com/owncast/owncast/storage/chatrepository"
+	"github.com/owncast/owncast/storage/userrepository"
 	"github.com/owncast/owncast/utils"
 	"github.com/owncast/owncast/webserver/requests"
 	"github.com/owncast/owncast/webserver/responses"
@@ -20,8 +21,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	chatRepository = chatrepository.GetChatRepository()
+	userRepository = userrepository.Get()
+)
+
 // ExternalUpdateMessageVisibility updates an array of message IDs to have the same visiblity.
-func (h *Handlers) ExternalUpdateMessageVisibility(integration user.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) ExternalUpdateMessageVisibility(integration models.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
 	h.UpdateMessageVisibility(w, r)
 }
 
@@ -66,7 +72,7 @@ func (h *Handlers) BanIPAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := data.BanIPAddress(configValue.Value.(string), "manually added"); err != nil {
+	if err := chatRepository.BanIPAddress(configValue.Value.(string), "manually added"); err != nil {
 		responses.WriteSimpleResponse(w, false, "error saving IP address ban")
 		return
 	}
@@ -86,7 +92,7 @@ func (h *Handlers) UnBanIPAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := data.RemoveIPAddressBan(configValue.Value.(string)); err != nil {
+	if err := chatRepository.RemoveIPAddressBan(configValue.Value.(string)); err != nil {
 		responses.WriteSimpleResponse(w, false, "error removing IP address ban")
 		return
 	}
@@ -96,7 +102,7 @@ func (h *Handlers) UnBanIPAddress(w http.ResponseWriter, r *http.Request) {
 
 // GetIPAddressBans will return all the banned IP addresses.
 func (h *Handlers) GetIPAddressBans(w http.ResponseWriter, r *http.Request) {
-	bans, err := data.GetIPAddressBans()
+	bans, err := chatRepository.GetIPAddressBans()
 	if err != nil {
 		responses.WriteSimpleResponse(w, false, err.Error())
 		return
@@ -132,7 +138,7 @@ func (h *Handlers) UpdateUserEnabled(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Disable/enable the user
-	if err := user.SetEnabled(request.UserID, request.Enabled); err != nil {
+	if err := userRepository.SetEnabled(request.UserID, request.Enabled); err != nil {
 		log.Errorln("error changing user enabled status", err)
 		responses.WriteSimpleResponse(w, false, err.Error())
 		return
@@ -163,14 +169,14 @@ func (h *Handlers) UpdateUserEnabled(w http.ResponseWriter, r *http.Request) {
 		}
 
 		chat.DisconnectClients(clients)
-		disconnectedUser := user.GetUserByID(request.UserID)
+		disconnectedUser := userRepository.GetUserByID(request.UserID)
 		_ = chat.SendSystemAction(fmt.Sprintf("**%s** has been removed from chat.", disconnectedUser.DisplayName), true)
 
 		// Ban this user's IP address.
 		for _, client := range clients {
 			ipAddress := client.IPAddress
 			reason := fmt.Sprintf("Banning of %s", disconnectedUser.DisplayName)
-			if err := data.BanIPAddress(ipAddress, reason); err != nil {
+			if err := chatRepository.BanIPAddress(ipAddress, reason); err != nil {
 				log.Errorln("error banning IP address: ", err)
 			}
 		}
@@ -183,7 +189,7 @@ func (h *Handlers) UpdateUserEnabled(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetDisabledUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	users := user.GetDisabledUsers()
+	users := userRepository.GetDisabledUsers()
 	responses.WriteResponse(w, users)
 }
 
@@ -208,7 +214,7 @@ func (h *Handlers) UpdateUserModerator(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the user object with new moderation access.
-	if err := user.SetModerator(req.UserID, req.IsModerator); err != nil {
+	if err := userRepository.SetModerator(req.UserID, req.IsModerator); err != nil {
 		responses.WriteSimpleResponse(w, false, err.Error())
 		return
 	}
@@ -225,7 +231,7 @@ func (h *Handlers) UpdateUserModerator(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetModerators(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	users := user.GetModeratorUsers()
+	users := userRepository.GetModeratorUsers()
 	responses.WriteResponse(w, users)
 }
 
@@ -238,7 +244,7 @@ func (h *Handlers) GetAdminChatMessages(w http.ResponseWriter, r *http.Request) 
 }
 
 // SendSystemMessage will send an official "SYSTEM" message to chat on behalf of your server.
-func (h *Handlers) SendSystemMessage(integration user.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) SendSystemMessage(integration models.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var message events.SystemMessageEvent
@@ -255,7 +261,7 @@ func (h *Handlers) SendSystemMessage(integration user.ExternalAPIUser, w http.Re
 }
 
 // SendSystemMessageToConnectedClient will handle incoming requests to send a single message to a single connected client by ID.
-func (h *Handlers) SendSystemMessageToConnectedClient(integration user.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) SendSystemMessageToConnectedClient(integration models.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	clientIDText, err := utils.ReadRestURLParameter(r, "clientId")
 	if err != nil {
@@ -280,13 +286,13 @@ func (h *Handlers) SendSystemMessageToConnectedClient(integration user.ExternalA
 }
 
 // SendUserMessage will send a message to chat on behalf of a user. *Depreciated*.
-func (h *Handlers) SendUserMessage(integration user.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) SendUserMessage(integration models.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	responses.BadRequestHandler(w, errors.New("no longer supported. see /api/integrations/chat/send"))
 }
 
 // SendIntegrationChatMessage will send a chat message on behalf of an external chat integration.
-func (h *Handlers) SendIntegrationChatMessage(integration user.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) SendIntegrationChatMessage(integration models.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	name := integration.DisplayName
@@ -310,7 +316,7 @@ func (h *Handlers) SendIntegrationChatMessage(integration user.ExternalAPIUser, 
 		return
 	}
 
-	event.User = &user.User{
+	event.User = &models.User{
 		ID:           integration.ID,
 		DisplayName:  name,
 		DisplayColor: integration.DisplayColor,
@@ -329,7 +335,7 @@ func (h *Handlers) SendIntegrationChatMessage(integration user.ExternalAPIUser, 
 }
 
 // SendChatAction will send a generic chat action.
-func (h *Handlers) SendChatAction(integration user.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) SendChatAction(integration models.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var message events.SystemActionEvent
@@ -362,7 +368,7 @@ func (h *Handlers) SetEnableEstablishedChatUserMode(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := data.SetChatEstablishedUsersOnlyMode(configValue.Value.(bool)); err != nil {
+	if err := configRepository.SetChatEstablishedUsersOnlyMode(configValue.Value.(bool)); err != nil {
 		responses.WriteSimpleResponse(w, false, err.Error())
 		return
 	}

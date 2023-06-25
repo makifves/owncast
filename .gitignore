@@ -45,3 +45,5 @@ test/automated/browser/cypress/videos
 
 web/public/sw.js
 web/public/workbox-*.js
+
+!storage/data

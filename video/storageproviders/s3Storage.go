@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/owncast/owncast/storage/configrepository"
 	"github.com/owncast/owncast/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -45,6 +46,8 @@ type S3Storage struct {
 	uploader *s3manager.Uploader
 }
 
+var configRepository = configrepository.Get()
+
 // NewS3Storage returns a new S3Storage instance.
 func NewS3Storage() *S3Storage {
 	return &S3Storage{
@@ -56,8 +59,8 @@ func NewS3Storage() *S3Storage {
 func (s *S3Storage) Setup() error {
 	log.Trace("Setting up S3 for external storage of video...")
 
-	s3Config := data.GetS3Config()
-	customVideoServingEndpoint := data.GetVideoServingEndpoint()
+	s3Config := configRepository.GetS3Config()
+	customVideoServingEndpoint := configRepository.GetVideoServingEndpoint()
 
 	if customVideoServingEndpoint != "" {
 		s.host = customVideoServingEndpoint
@@ -97,7 +100,7 @@ func (s *S3Storage) SegmentWritten(localFilePath string) {
 
 	// Warn the user about long-running save operations
 	if averagePerformance != 0 {
-		if averagePerformance > float64(data.GetStreamLatencyLevel().SecondsPerSegment)*0.9 {
+		if averagePerformance > float64(configRepository.GetStreamLatencyLevel().SecondsPerSegment)*0.9 {
 			log.Warnln("Possible slow uploads: average upload S3 save duration", averagePerformance, "s. troubleshoot this issue by visiting https://owncast.online/docs/troubleshooting/")
 		}
 	}
@@ -193,7 +196,7 @@ func (s *S3Storage) Save(filePath string, retryCount int) (string, error) {
 
 func (s *S3Storage) Cleanup() error {
 	// Determine how many files we should keep on S3 storage
-	maxNumber := data.GetStreamLatencyLevel().SegmentCount
+	maxNumber := configRepository.GetStreamLatencyLevel().SegmentCount
 	buffer := 20
 
 	keys, err := s.getDeletableVideoSegmentsWithOffset(maxNumber + buffer)
