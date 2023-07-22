@@ -27,7 +27,7 @@ func rewriteRemotePlaylist(localFilePath, remoteServingEndpoint string) error {
 	for _, item := range p.Variants {
 		item.URI = remoteServingEndpoint + filepath.Join("/hls", item.URI)
 	}
-	c := config.GetConfig()
+	c := config.Get()
 	publicPath := filepath.Join(c.HLSStoragePath, filepath.Base(localFilePath))
 
 	newPlaylist := p.String()
